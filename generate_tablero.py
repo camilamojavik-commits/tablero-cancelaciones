@@ -14,14 +14,39 @@ from collections import Counter
 
 API_URL = os.environ["CODERHOUSE_API_URL"].rstrip("/")
 API_KEY = os.environ["CODERHOUSE_API_KEY"]
+FINANCE_API_KEY = os.environ.get("CODERHOUSE_FINANCE_API_KEY", "")
 HEADERS = {"X-API-Key": API_KEY}
+FINANCE_HEADERS = {"X-API-Key": FINANCE_API_KEY} if FINANCE_API_KEY else HEADERS
 PASSWORD_HASH = os.environ.get("TABLERO_PASSWORD_HASH", "a7cd2c7716c339dec5e9d8da39c54c86aaffabe839287323ffd1bb97384a8217")
 
 
-def api_get(path):
-    r = requests.get(f"{API_URL}{path}", headers=HEADERS, timeout=30)
+def api_get(path, headers=None):
+    h = headers or HEADERS
+    r = requests.get(f"{API_URL}{path}", headers=h, timeout=30)
     r.raise_for_status()
     return r.json()
+
+
+def fetch_all_active_cohorts():
+    """Fetch ALL IN_PROGRESS cohorts using finance key for admin access."""
+    items, page = [], 1
+    while True:
+        try:
+            data = api_get(
+                f"/student/enrollment/m2m/admin/cohorts?status=IN_PROGRESS&page={page}&limit=100",
+                headers=FINANCE_HEADERS
+            )
+            batch = data.get("items", [])
+            if not batch:
+                break
+            items.extend(batch)
+            if page >= data.get("totalPages", 1):
+                break
+            page += 1
+        except Exception as e:
+            print(f"  Warning fetching all cohorts page {page}: {e}")
+            break
+    return items
 
 
 def fetch_all_incidents(status):
@@ -98,18 +123,36 @@ def build_dataset():
         })
     print(f"Final incident records: {len(records)}")
 
-    # Build cohort_schedule from already-fetched cohort data (reuse incident lookups)
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Try to fetch ALL active cohorts (requires finance/admin key)
+    print("Fetching ALL active cohorts for class density (finance key)...")
+    all_active_raw = fetch_all_active_cohorts()
+    print(f"  All active cohorts fetched: {len(all_active_raw)}")
+
+    if all_active_raw:
+        # Use full universe — correct denominator
+        source = all_active_raw
+        denominator_label = "todas las cohortes activas"
+    else:
+        # Fallback: use only cohorts that had incidents
+        print("  Fallback: using incident cohorts only")
+        source = [
+            {**v, "id": k} for k, v in cohort_map.items()
+            if v.get("weekDays")
+        ]
+        denominator_label = "cohortes con incidents"
+
     cohort_schedule = []
     seen_commissions = set()
-    for cid, cohort in cohort_map.items():
-        name = cohort.get("name", "")
+    for c in source:
+        name = c.get("name", "")
         if is_test_cohort(name):
             continue
-        week_days = cohort.get("weekDays") or []
+        week_days = c.get("weekDays") or []
         if not week_days:
             continue
-        comm = cohort.get("commissionNumber", "")
+        comm = str(c.get("commissionNumber", ""))
         if comm in seen_commissions:
             continue
         seen_commissions.add(comm)
@@ -117,10 +160,10 @@ def build_dataset():
             "commissionNumber": comm,
             "name": name,
             "weekDays": week_days,
-            "startDate": cohort.get("startDate", ""),
-            "endDate": cohort.get("endDate") or today_str,
+            "startDate": (c.get("startDate") or "")[:10],
+            "endDate": (c.get("endDate") or today_str)[:10],
         })
-    print(f"Cohorts with schedule data: {len(cohort_schedule)}")
+    print(f"Cohorts for density ({denominator_label}): {len(cohort_schedule)}")
 
     return records, cohort_schedule
 

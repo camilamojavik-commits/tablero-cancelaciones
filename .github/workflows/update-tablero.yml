@@ -28,6 +28,7 @@ jobs:
         env:
           CODERHOUSE_API_URL: ${{ secrets.CODERHOUSE_API_URL }}
           CODERHOUSE_API_KEY: ${{ secrets.CODERHOUSE_API_KEY }}
+          CODERHOUSE_FINANCE_API_KEY: ${{ secrets.CODERHOUSE_FINANCE_API_KEY }}
           TABLERO_PASSWORD_HASH: ${{ secrets.TABLERO_PASSWORD_HASH }}
         run: python generate_tablero.py
 
