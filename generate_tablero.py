@@ -35,24 +35,6 @@ def fetch_all_incidents(status):
     return items
 
 
-def fetch_all_active_cohorts():
-    """Fetch all IN_PROGRESS cohorts to calculate expected class totals."""
-    items, page = [], 1
-    while True:
-        try:
-            data = api_get(f"/student/enrollment/m2m/admin/cohorts?status=IN_PROGRESS&page={page}&limit=100")
-            batch = data.get("items", [])
-            if not batch:
-                break
-            items.extend(batch)
-            if page >= data.get("totalPages", 1):
-                break
-            page += 1
-        except Exception as e:
-            print(f"  Warning fetching cohorts page {page}: {e}")
-            break
-    return items
-
 
 def is_test_cohort(name):
     if not name:
@@ -69,9 +51,15 @@ def fetch_cohort(cohort_id, cache={}):
         return cache[cohort_id]
     try:
         data = api_get(f"/student/enrollment/m2m/cohorts/{cohort_id}")
-        result = {"name": data.get("name", ""), "commissionNumber": str(data.get("commissionNumber", ""))}
+        result = {
+            "name": data.get("name", ""),
+            "commissionNumber": str(data.get("commissionNumber", "")),
+            "weekDays": data.get("weekDays") or [],
+            "startDate": (data.get("startDate") or "")[:10],
+            "endDate": (data.get("endDate") or "")[:10],
+        }
     except Exception:
-        result = {"name": "", "commissionNumber": ""}
+        result = {"name": "", "commissionNumber": "", "weekDays": [], "startDate": "", "endDate": ""}
     cache[cohort_id] = result
     return result
 
@@ -110,26 +98,29 @@ def build_dataset():
         })
     print(f"Final incident records: {len(records)}")
 
-    # Fetch active cohorts for class density calculation
-    print("Fetching active cohorts for class density...")
-    active_cohorts_raw = fetch_all_active_cohorts()
+    # Build cohort_schedule from already-fetched cohort data (reuse incident lookups)
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     cohort_schedule = []
-    for c in active_cohorts_raw:
-        name = c.get("name", "")
+    seen_commissions = set()
+    for cid, cohort in cohort_map.items():
+        name = cohort.get("name", "")
         if is_test_cohort(name):
             continue
-        week_days = c.get("weekDays") or []
+        week_days = cohort.get("weekDays") or []
         if not week_days:
             continue
+        comm = cohort.get("commissionNumber", "")
+        if comm in seen_commissions:
+            continue
+        seen_commissions.add(comm)
         cohort_schedule.append({
-            "commissionNumber": str(c.get("commissionNumber", "")),
+            "commissionNumber": comm,
             "name": name,
             "weekDays": week_days,
-            "startDate": (c.get("startDate") or "")[:10],
-            "endDate": (c.get("endDate") or today_str)[:10],
+            "startDate": cohort.get("startDate", ""),
+            "endDate": cohort.get("endDate") or today_str,
         })
-    print(f"Active cohorts for density: {len(cohort_schedule)}")
+    print(f"Cohorts with schedule data: {len(cohort_schedule)}")
 
     return records, cohort_schedule
 
@@ -308,7 +299,7 @@ def generate_html(records, cohort_schedule, password_hash):
       <div class="kpi-card kpi-rate-card">
         <div class="kpi-label">Tasa de cancelación</div>
         <div class="kpi-value" id="kpi-rate">—</div>
-        <div class="kpi-sub" id="kpi-rate-sub">% del total de clases</div>
+        <div class="kpi-sub" id="kpi-rate-sub">cancel. / clases dictadas</div>
         <div class="kpi-detail" id="kpi-rate-detail"></div>
       </div>
       <div class="kpi-card">
@@ -526,8 +517,8 @@ function renderKPIs() {{
     document.getElementById("kpi-rate-detail").textContent = "Sin clases en el período";
   }} else {{
     document.getElementById("kpi-rate").textContent        = "—";
-    document.getElementById("kpi-rate-sub").textContent    = "solo cohortes activas";
-    document.getElementById("kpi-rate-detail").textContent = "completadas no incluidas";
+    document.getElementById("kpi-rate-sub").textContent    = "sin datos de horario";
+    document.getElementById("kpi-rate-detail").textContent = "";
   }}
 }}
 
