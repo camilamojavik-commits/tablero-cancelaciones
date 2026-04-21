@@ -1,0 +1,40 @@
+name: Actualizar Tablero de Cancelaciones
+
+on:
+  schedule:
+    # 9am Argentina (UTC-3) = 12pm UTC, todos los días
+    - cron: '0 12 * * *'
+  workflow_dispatch:  # también se puede correr manualmente
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Generar tablero HTML
+        env:
+          CODERHOUSE_API_URL: ${{ secrets.CODERHOUSE_API_URL }}
+          CODERHOUSE_API_KEY: ${{ secrets.CODERHOUSE_API_KEY }}
+          TABLERO_PASSWORD_HASH: ${{ secrets.TABLERO_PASSWORD_HASH }}
+        run: python generate_tablero.py
+
+      - name: Deploy a GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output
+          publish_branch: gh-pages
+          commit_message: "🤖 Tablero actualizado $(date +'%d/%m/%Y %H:%M')"
