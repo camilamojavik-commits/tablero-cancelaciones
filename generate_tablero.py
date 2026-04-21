@@ -8,7 +8,6 @@ Requiere: CODERHOUSE_API_URL, CODERHOUSE_API_KEY como variables de entorno.
 import os
 import re
 import json
-import hashlib
 import requests
 from datetime import datetime, timezone
 from collections import Counter
@@ -33,6 +32,25 @@ def fetch_all_incidents(status):
         if page >= data.get("totalPages", 1):
             break
         page += 1
+    return items
+
+
+def fetch_all_active_cohorts():
+    """Fetch all IN_PROGRESS cohorts to calculate expected class totals."""
+    items, page = [], 1
+    while True:
+        try:
+            data = api_get(f"/student/enrollment/m2m/admin/cohorts?status=IN_PROGRESS&page={page}&limit=100")
+            batch = data.get("items", [])
+            if not batch:
+                break
+            items.extend(batch)
+            if page >= data.get("totalPages", 1):
+                break
+            page += 1
+        except Exception as e:
+            print(f"  Warning fetching cohorts page {page}: {e}")
+            break
     return items
 
 
@@ -66,11 +84,9 @@ def build_dataset():
         print(f"  {status}: {len(items)}")
         all_incidents.extend(items)
 
-    # Filter by type
     filtered = [i for i in all_incidents if i.get("type") in ("INSTRUCTOR_ABSENCE", "CLASS_ISSUES")]
     print(f"After type filter: {len(filtered)}")
 
-    # Collect unique targetIds
     target_ids = set(i.get("targetId", "") for i in filtered if i.get("targetId"))
     print(f"Fetching {len(target_ids)} cohorts...")
 
@@ -92,26 +108,36 @@ def build_dataset():
             "cohortName": name,
             "commissionNumber": cohort.get("commissionNumber", ""),
         })
+    print(f"Final incident records: {len(records)}")
 
-    print(f"Final records: {len(records)}")
-    return records
+    # Fetch active cohorts for class density calculation
+    print("Fetching active cohorts for class density...")
+    active_cohorts_raw = fetch_all_active_cohorts()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cohort_schedule = []
+    for c in active_cohorts_raw:
+        name = c.get("name", "")
+        if is_test_cohort(name):
+            continue
+        week_days = c.get("weekDays") or []
+        if not week_days:
+            continue
+        cohort_schedule.append({
+            "commissionNumber": str(c.get("commissionNumber", "")),
+            "name": name,
+            "weekDays": week_days,
+            "startDate": (c.get("startDate") or "")[:10],
+            "endDate": (c.get("endDate") or today_str)[:10],
+        })
+    print(f"Active cohorts for density: {len(cohort_schedule)}")
+
+    return records, cohort_schedule
 
 
-def generate_html(records, password_hash):
+def generate_html(records, cohort_schedule, password_hash):
     today = datetime.now(timezone.utc).strftime("%d/%m/%Y")
     data_json = json.dumps(records, ensure_ascii=False)
-
-    if records:
-        dates = sorted(r["date"] for r in records)
-        date_range = f"{dates[0].split('-')[::-1][0]}/{dates[0].split('-')[1]}/{dates[0].split('-')[0]} — {dates[-1].split('-')[::-1][0]}/{dates[-1].split('-')[1]}/{dates[-1].split('-')[0]}"
-        top_course = Counter(r["cohortName"] for r in records).most_common(1)[0]
-        total = len(records)
-        top3 = Counter(r["cohortName"] for r in records).most_common(3)
-    else:
-        date_range = "Sin datos"
-        top_course = ("—", 0)
-        total = 0
-        top3 = []
+    cohort_data_json = json.dumps(cohort_schedule, ensure_ascii=False)
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -167,11 +193,15 @@ def generate_html(records, password_hash):
 
   /* MAIN */
   .main {{ padding: 32px 40px; }}
-  .kpi-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 32px; }}
-  .kpi-card {{ background: #fff; border-radius: 8px; padding: 24px 20px; border-bottom: 3px solid #FF632B; box-shadow: 0 1px 4px rgba(0,0,0,.06); }}
-  .kpi-card .kpi-label {{ font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #BBBBBB; margin-bottom: 10px; }}
-  .kpi-card .kpi-value {{ font-size: 40px; font-weight: 800; color: #FF632B; line-height: 1; }}
-  .kpi-card .kpi-sub {{ font-size: 12px; color: #313131; margin-top: 6px; }}
+  .kpi-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }}
+  .kpi-card {{ background: #fff; border-radius: 8px; padding: 20px 18px; border-bottom: 3px solid #FF632B; box-shadow: 0 1px 4px rgba(0,0,0,.06); }}
+  .kpi-card.kpi-rate-card {{ border-bottom-color: #FE64A3; }}
+  .kpi-card .kpi-label {{ font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #BBBBBB; margin-bottom: 10px; }}
+  .kpi-card .kpi-value {{ font-size: 36px; font-weight: 800; color: #FF632B; line-height: 1; }}
+  .kpi-card.kpi-rate-card .kpi-value {{ color: #FE64A3; }}
+  .kpi-card .kpi-sub {{ font-size: 11px; color: #313131; margin-top: 6px; }}
+  .kpi-card .kpi-detail {{ font-size: 10px; color: #BBBBBB; margin-top: 3px; }}
+
   .charts-row {{ display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px; }}
   .chart-card {{ background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }}
   .chart-card h2 {{ font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #BBBBBB; margin-bottom: 20px; }}
@@ -180,21 +210,26 @@ def generate_html(records, password_hash):
   .bar {{ width: 24px; border-radius: 4px 4px 0 0; cursor: pointer; transition: opacity .15s; min-height: 3px; }}
   .bar:hover {{ opacity: .8; }}
   .bar-label {{ font-size: 9px; color: #BBBBBB; margin-top: 4px; text-align: center; width: 28px; }}
-  .tooltip-box {{ position: fixed; z-index: 9999; background: #260700; color: #fff; border-radius: 8px; padding: 12px 16px; font-size: 12px; max-width: 280px; pointer-events: none; display: none; line-height: 1.5; box-shadow: 0 4px 20px rgba(0,0,0,.3); }}
+  .tooltip-box {{ position: fixed; z-index: 9999; background: #260700; color: #fff; border-radius: 8px; padding: 12px 16px; font-size: 12px; max-width: 300px; pointer-events: none; display: none; line-height: 1.5; box-shadow: 0 4px 20px rgba(0,0,0,.3); }}
   .tooltip-box strong {{ color: #FE872D; display: block; margin-bottom: 6px; }}
   .tooltip-incident {{ border-left: 2px solid #FF632B; padding-left: 8px; margin-top: 6px; font-size: 11px; }}
-  .ranking-list {{ display: flex; flex-direction: column; gap: 10px; }}
+  .tooltip-stat {{ color: #FE64A3; font-size: 11px; margin-top: 4px; }}
+
+  .ranking-list {{ display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; }}
   .ranking-item {{ display: flex; flex-direction: column; gap: 4px; }}
-  .rank-label {{ font-size: 12px; font-weight: 600; color: #171717; display: flex; justify-content: space-between; }}
-  .rank-count {{ color: #FF632B; font-weight: 700; }}
+  .rank-label {{ font-size: 12px; font-weight: 600; color: #171717; display: flex; justify-content: space-between; align-items: center; gap: 6px; }}
+  .rank-count {{ color: #FF632B; font-weight: 700; white-space: nowrap; }}
+  .rank-rate {{ background: #fff0f6; color: #FE64A3; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 2px 7px; white-space: nowrap; }}
   .rank-bar-bg {{ background: #F8F2E8; border-radius: 4px; height: 8px; overflow: hidden; }}
   .rank-bar-fill {{ height: 100%; background: #FF632B; border-radius: 4px; }}
+
   .type-row {{ display: flex; gap: 12px; margin-bottom: 24px; }}
   .type-card {{ flex: 1; background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; align-items: center; gap: 16px; }}
   .type-dot {{ width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }}
   .type-name {{ font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #BBBBBB; }}
   .type-count {{ font-size: 28px; font-weight: 800; color: #171717; }}
   .type-pct {{ font-size: 12px; color: #BBBBBB; }}
+
   .table-section {{ background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }}
   .table-header {{ background: #260700; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }}
   .table-header h2 {{ color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }}
@@ -219,14 +254,17 @@ def generate_html(records, password_hash):
   .badge-in-progress {{ background: #fff8e0; color: #f9a825; }}
   .badge-resolved {{ background: #e8f5e9; color: #2e7d32; }}
   .badge-cancelled {{ background: #f0f0f0; color: #888; }}
+
   .footer {{ background: #171717; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }}
   .footer-logo {{ color: #FF632B; font-size: 16px; font-weight: 800; letter-spacing: 3px; }}
   .footer-date {{ color: #555; font-size: 12px; }}
+
   @media (max-width: 900px) {{
     .kpi-grid {{ grid-template-columns: repeat(2, 1fr); }}
     .charts-row {{ grid-template-columns: 1fr; }}
     .main {{ padding: 20px; }}
     .header, .filter-bar {{ padding: 16px 20px; }}
+    .type-row {{ flex-direction: column; }}
   }}
 </style>
 </head>
@@ -262,26 +300,62 @@ def generate_html(records, password_hash):
 
   <div class="main">
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Total cancelaciones</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">incidents en el período</div></div>
-      <div class="kpi-card"><div class="kpi-label">Comisiones afectadas</div><div class="kpi-value" id="kpi-commissions">—</div><div class="kpi-sub">comisiones únicas</div></div>
-      <div class="kpi-card"><div class="kpi-label">Días con incidents</div><div class="kpi-value" id="kpi-days">—</div><div class="kpi-sub">días distintos</div></div>
-      <div class="kpi-card"><div class="kpi-label">Top curso afectado</div><div class="kpi-value" id="kpi-top-count">—</div><div class="kpi-sub" id="kpi-top-name">—</div></div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total cancelaciones</div>
+        <div class="kpi-value" id="kpi-total">—</div>
+        <div class="kpi-sub">incidents en el período</div>
+      </div>
+      <div class="kpi-card kpi-rate-card">
+        <div class="kpi-label">Tasa de cancelación</div>
+        <div class="kpi-value" id="kpi-rate">—</div>
+        <div class="kpi-sub" id="kpi-rate-sub">% del total de clases</div>
+        <div class="kpi-detail" id="kpi-rate-detail"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Comisiones afectadas</div>
+        <div class="kpi-value" id="kpi-commissions">—</div>
+        <div class="kpi-sub">comisiones únicas</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Días con incidents</div>
+        <div class="kpi-value" id="kpi-days">—</div>
+        <div class="kpi-sub">días distintos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Top curso afectado</div>
+        <div class="kpi-value" id="kpi-top-count">—</div>
+        <div class="kpi-sub" id="kpi-top-name">—</div>
+      </div>
     </div>
 
     <div class="type-row">
       <div class="type-card">
         <div class="type-dot" style="background:#FF632B"></div>
-        <div><div class="type-name">Ausencia de Instructor</div><div class="type-count" id="type-absence-count">—</div><div class="type-pct" id="type-absence-pct">—</div></div>
+        <div>
+          <div class="type-name">Ausencia de Instructor</div>
+          <div class="type-count" id="type-absence-count">—</div>
+          <div class="type-pct" id="type-absence-pct">—</div>
+        </div>
       </div>
       <div class="type-card">
         <div class="type-dot" style="background:#FE64A3"></div>
-        <div><div class="type-name">Problemas de Clase</div><div class="type-count" id="type-issues-count">—</div><div class="type-pct" id="type-issues-pct">—</div></div>
+        <div>
+          <div class="type-name">Problemas de Clase</div>
+          <div class="type-count" id="type-issues-count">—</div>
+          <div class="type-pct" id="type-issues-pct">—</div>
+        </div>
       </div>
     </div>
 
     <div class="charts-row">
-      <div class="chart-card"><h2>Incidents por día</h2><div class="timeline-bars" id="timeline-bars"></div></div>
-      <div class="chart-card"><h2>Top comisiones</h2><div class="ranking-list" id="ranking-list"></div></div>
+      <div class="chart-card">
+        <h2>Incidents por día</h2>
+        <div class="timeline-bars" id="timeline-bars"></div>
+      </div>
+      <div class="chart-card">
+        <h2>Top comisiones · cancelaciones / clases</h2>
+        <div class="ranking-list" id="ranking-list"></div>
+      </div>
     </div>
 
     <div class="table-section">
@@ -296,8 +370,10 @@ def generate_html(records, password_hash):
       </div>
       <div class="table-result-info" id="table-info"></div>
       <div style="overflow-x:auto">
-        <table><thead><tr><th>Fecha</th><th>Curso</th><th>Comisión</th><th>Tipo</th><th>Estado</th><th>Descripción</th></tr></thead>
-        <tbody id="table-body"></tbody></table>
+        <table>
+          <thead><tr><th>Fecha</th><th>Curso</th><th>Comisión</th><th>Tipo</th><th>Estado</th><th>Descripción</th></tr></thead>
+          <tbody id="table-body"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -313,9 +389,12 @@ def generate_html(records, password_hash):
 <script>
 const PWD_HASH = "{password_hash}";
 const ALL_DATA = {data_json};
+const COHORT_DATA = {cohort_data_json};
+
 let filteredData = [...ALL_DATA];
 let typeFilter = "ALL";
 
+// ─── AUTH ──────────────────────────────────────────────────────
 async function sha256(str) {{
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
@@ -341,6 +420,45 @@ if (sessionStorage.getItem("auth") === "1") {{
   setTimeout(init, 0);
 }}
 
+// ─── CLASS COUNT (cruce con cohortes activas) ───────────────────
+function countTotalClasses(from, to) {{
+  if (!from || !to || !COHORT_DATA || !COHORT_DATA.length) return null;
+  let total = 0;
+  const fromD = new Date(from + "T00:00:00");
+  const toD   = new Date(to   + "T00:00:00");
+  COHORT_DATA.forEach(c => {{
+    if (!c.weekDays || !c.weekDays.length) return;
+    const cohortStart = c.startDate ? new Date(c.startDate + "T00:00:00") : fromD;
+    const cohortEnd   = c.endDate   ? new Date(c.endDate   + "T00:00:00") : toD;
+    const rangeStart  = new Date(Math.max(fromD.getTime(), cohortStart.getTime()));
+    const rangeEnd    = new Date(Math.min(toD.getTime(),   cohortEnd.getTime()));
+    if (rangeStart > rangeEnd) return;
+    for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {{
+      if (c.weekDays.includes(d.getDay())) total++;
+    }}
+  }});
+  return total || null;
+}}
+
+function countCommissionClasses(commNumber, from, to) {{
+  if (!commNumber || !from || !to) return null;
+  const c = COHORT_DATA.find(x => x.commissionNumber === String(commNumber));
+  if (!c || !c.weekDays || !c.weekDays.length) return null;
+  let total = 0;
+  const fromD       = new Date(from + "T00:00:00");
+  const toD         = new Date(to   + "T00:00:00");
+  const cohortStart = c.startDate ? new Date(c.startDate + "T00:00:00") : fromD;
+  const cohortEnd   = c.endDate   ? new Date(c.endDate   + "T00:00:00") : toD;
+  const rangeStart  = new Date(Math.max(fromD.getTime(), cohortStart.getTime()));
+  const rangeEnd    = new Date(Math.min(toD.getTime(),   cohortEnd.getTime()));
+  if (rangeStart > rangeEnd) return null;
+  for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {{
+    if (c.weekDays.includes(d.getDay())) total++;
+  }}
+  return total || null;
+}}
+
+// ─── FILTERS ───────────────────────────────────────────────────
 function getRange() {{
   const dates = ALL_DATA.map(d => d.date).sort();
   return {{ min: dates[0] || "", max: dates[dates.length-1] || "" }};
@@ -348,7 +466,7 @@ function getRange() {{
 
 function applyFilters() {{
   const from = document.getElementById("date-from").value;
-  const to = document.getElementById("date-to").value;
+  const to   = document.getElementById("date-to").value;
   filteredData = ALL_DATA.filter(d => (!from || d.date >= from) && (!to || d.date <= to));
   updateAll();
 }}
@@ -356,7 +474,7 @@ function applyFilters() {{
 function resetFilters() {{
   const r = getRange();
   document.getElementById("date-from").value = r.min;
-  document.getElementById("date-to").value = r.max;
+  document.getElementById("date-to").value   = r.max;
   filteredData = [...ALL_DATA];
   updateAll();
 }}
@@ -370,58 +488,90 @@ function setTypeFilter(btn) {{
 
 function updateAll() {{
   const from = document.getElementById("date-from").value;
-  const to = document.getElementById("date-to").value;
+  const to   = document.getElementById("date-to").value;
   const fmt = d => d ? d.split("-").reverse().join("/") : "—";
   document.getElementById("period-label").textContent = `${{fmt(from)}} — ${{fmt(to)}}`;
-  document.getElementById("filter-info").textContent = `${{filteredData.length}} de ${{ALL_DATA.length}} incidents`;
+  document.getElementById("filter-info").textContent  = `${{filteredData.length}} de ${{ALL_DATA.length}} incidents`;
   renderKPIs(); renderTypes(); renderTimeline(); renderRanking(); renderTable();
 }}
 
+// ─── KPIs ──────────────────────────────────────────────────────
 function renderKPIs() {{
+  const from  = document.getElementById("date-from").value;
+  const to    = document.getElementById("date-to").value;
   const total = filteredData.length;
   const comms = new Set(filteredData.map(d => d.commissionNumber)).size;
-  const days = new Set(filteredData.map(d => d.date)).size;
-  const cc = {{}};
-  filteredData.forEach(d => cc[d.cohortName] = (cc[d.cohortName]||0)+1);
-  const top = Object.entries(cc).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById("kpi-total").textContent = total;
+  const days  = new Set(filteredData.map(d => d.date)).size;
+  const cc    = {{}};
+  filteredData.forEach(d => cc[d.cohortName] = (cc[d.cohortName] || 0) + 1);
+  const top   = Object.entries(cc).sort((a,b) => b[1] - a[1])[0];
+
+  document.getElementById("kpi-total").textContent       = total;
   document.getElementById("kpi-commissions").textContent = comms;
-  document.getElementById("kpi-days").textContent = days;
+  document.getElementById("kpi-days").textContent        = days;
   if (top) {{
     document.getElementById("kpi-top-count").textContent = top[1];
-    document.getElementById("kpi-top-name").textContent = top[0].length > 30 ? top[0].slice(0,28)+"…" : top[0];
+    document.getElementById("kpi-top-name").textContent  = top[0].length > 28 ? top[0].slice(0,26)+"…" : top[0];
+  }}
+
+  // Tasa de cancelación vs clases dictadas
+  const totalClasses = countTotalClasses(from, to);
+  if (totalClasses && total > 0) {{
+    const rate = ((total / totalClasses) * 100).toFixed(1);
+    document.getElementById("kpi-rate").textContent       = rate + "%";
+    document.getElementById("kpi-rate-sub").textContent   = "del total de clases";
+    document.getElementById("kpi-rate-detail").textContent = `${{total}} cancel. / ${{totalClasses}} clases`;
+  }} else if (totalClasses === 0) {{
+    document.getElementById("kpi-rate").textContent        = "0%";
+    document.getElementById("kpi-rate-detail").textContent = "Sin clases en el período";
+  }} else {{
+    document.getElementById("kpi-rate").textContent        = "—";
+    document.getElementById("kpi-rate-sub").textContent    = "solo cohortes activas";
+    document.getElementById("kpi-rate-detail").textContent = "completadas no incluidas";
   }}
 }}
 
+// ─── TYPE BREAKDOWN ────────────────────────────────────────────
 function renderTypes() {{
   const total = filteredData.length || 1;
-  const ab = filteredData.filter(d=>d.type==="INSTRUCTOR_ABSENCE").length;
-  const is = filteredData.filter(d=>d.type==="CLASS_ISSUES").length;
+  const ab    = filteredData.filter(d => d.type === "INSTRUCTOR_ABSENCE").length;
+  const is    = filteredData.filter(d => d.type === "CLASS_ISSUES").length;
   document.getElementById("type-absence-count").textContent = ab;
-  document.getElementById("type-absence-pct").textContent = `${{((ab/total)*100).toFixed(1)}}% del total`;
-  document.getElementById("type-issues-count").textContent = is;
-  document.getElementById("type-issues-pct").textContent = `${{((is/total)*100).toFixed(1)}}% del total`;
+  document.getElementById("type-absence-pct").textContent   = `${{((ab/total)*100).toFixed(1)}}% del total`;
+  document.getElementById("type-issues-count").textContent  = is;
+  document.getElementById("type-issues-pct").textContent    = `${{((is/total)*100).toFixed(1)}}% del total`;
 }}
 
+// ─── TIMELINE ──────────────────────────────────────────────────
 function renderTimeline() {{
   const container = document.getElementById("timeline-bars");
-  const byDate = {{}};
-  filteredData.forEach(d => {{ if (!byDate[d.date]) byDate[d.date]=[]; byDate[d.date].push(d); }});
+  const byDate    = {{}};
+  filteredData.forEach(d => {{ if (!byDate[d.date]) byDate[d.date] = []; byDate[d.date].push(d); }});
   const dates = Object.keys(byDate).sort();
-  const maxH = 130, maxC = Math.max(...dates.map(d=>byDate[d].length), 1);
-  const tt = document.getElementById("tooltip");
+  const maxH  = 130, maxC = Math.max(...dates.map(d => byDate[d].length), 1);
+  const from  = document.getElementById("date-from").value;
+  const to    = document.getElementById("date-to").value;
+  const tt    = document.getElementById("tooltip");
   container.innerHTML = "";
   dates.forEach(date => {{
     const items = byDate[date];
-    const h = Math.max(6, (items.length/maxC)*maxH);
-    const dp = date.split("-"); const short = `${{dp[2]}}/${{dp[1]}}`;
-    const col = document.createElement("div"); col.className = "timeline-bar-col";
+    const h     = Math.max(6, (items.length / maxC) * maxH);
+    const dp    = date.split("-"), short = `${{dp[2]}}/${{dp[1]}}`;
+    const classCount = countTotalClasses(date, date);
+    const col   = document.createElement("div");
+    col.className = "timeline-bar-col";
     col.innerHTML = `<div style="display:flex;align-items:flex-end"><div class="bar" style="height:${{h}}px;background:#FF632B" data-date="${{date}}"></div></div><div class="bar-label">${{short}}</div>`;
     const bar = col.querySelector(".bar");
     bar.addEventListener("mouseenter", e => {{
       let html = `<strong>${{date.split("-").reverse().join("/")}} — ${{items.length}} incident${{items.length!==1?"s":""}}</strong>`;
-      items.slice(0,5).forEach(i => {{ html += `<div class="tooltip-incident">${{i.cohortName||"—"}} #${{i.commissionNumber}}<br>${{(i.description||i.summary||"—").slice(0,60)}}</div>`; }});
-      if (items.length>5) html += `<div style="color:#888;font-size:10px;margin-top:6px">+${{items.length-5}} más...</div>`;
+      if (classCount) {{
+        const dayRate = ((items.length / classCount) * 100).toFixed(1);
+        html += `<div class="tooltip-stat">${{items.length}} / ${{classCount}} clases = ${{dayRate}}% ese día</div>`;
+      }}
+      items.slice(0,5).forEach(i => {{
+        html += `<div class="tooltip-incident">${{i.cohortName||"—"}} #${{i.commissionNumber}}<br>${{(i.description||i.summary||"—").slice(0,60)}}</div>`;
+      }});
+      if (items.length > 5) html += `<div style="color:#888;font-size:10px;margin-top:6px">+${{items.length-5}} más...</div>`;
       tt.innerHTML = html; tt.style.display = "block"; posTooltip(e);
     }});
     bar.addEventListener("mousemove", posTooltip);
@@ -432,42 +582,73 @@ function renderTimeline() {{
 
 function posTooltip(e) {{
   const tt = document.getElementById("tooltip"), m = 12;
-  let x = e.clientX+m, y = e.clientY+m;
-  if (x+(tt.offsetWidth||280) > window.innerWidth-m) x = e.clientX-(tt.offsetWidth||280)-m;
-  if (y+(tt.offsetHeight||100) > window.innerHeight-m) y = e.clientY-(tt.offsetHeight||100)-m;
-  tt.style.left=x+"px"; tt.style.top=y+"px";
+  let x = e.clientX + m, y = e.clientY + m;
+  if (x + (tt.offsetWidth  || 300) > window.innerWidth  - m) x = e.clientX - (tt.offsetWidth  || 300) - m;
+  if (y + (tt.offsetHeight || 100) > window.innerHeight - m) y = e.clientY - (tt.offsetHeight || 100) - m;
+  tt.style.left = x + "px"; tt.style.top = y + "px";
 }}
 
+// ─── RANKING ───────────────────────────────────────────────────
 function renderRanking() {{
   const container = document.getElementById("ranking-list");
-  const byCohort = {{}};
-  filteredData.forEach(d => {{ const k=`${{d.cohortName}}|||${{d.commissionNumber}}`; byCohort[k]=(byCohort[k]||0)+1; }});
-  const sorted = Object.entries(byCohort).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const maxV = sorted[0]?.[1] || 1;
-  container.innerHTML = sorted.map(([key,count]) => {{
-    const [course,comm] = key.split("|||");
-    const short = course.length>30 ? course.slice(0,28)+"…" : course;
-    return `<div class="ranking-item"><div class="rank-label"><span>${{short}} <span style="color:#BBBBBB;font-weight:400">#${{comm}}</span></span><span class="rank-count">${{count}}</span></div><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${{(count/maxV)*100}}%"></div></div></div>`;
+  const from      = document.getElementById("date-from").value;
+  const to        = document.getElementById("date-to").value;
+  const byCohort  = {{}};
+  filteredData.forEach(d => {{
+    const k = `${{d.cohortName}}|||${{d.commissionNumber}}`;
+    byCohort[k] = (byCohort[k] || 0) + 1;
+  }});
+  const sorted = Object.entries(byCohort).sort((a,b) => b[1] - a[1]).slice(0,10);
+  const maxV   = sorted[0]?.[1] || 1;
+  container.innerHTML = sorted.map(([key, count]) => {{
+    const [course, comm]  = key.split("|||");
+    const short           = course.length > 28 ? course.slice(0,26)+"…" : course;
+    const classCount      = countCommissionClasses(comm, from, to);
+    const rateTag         = classCount ? `<span class="rank-rate">${{((count/classCount)*100).toFixed(0)}}%</span>` : "";
+    return `<div class="ranking-item">
+      <div class="rank-label">
+        <span>${{short}} <span style="color:#BBBBBB;font-weight:400">#${{comm}}</span></span>
+        <span style="display:flex;align-items:center;gap:6px"><span class="rank-count">${{count}}</span>${{rateTag}}</span>
+      </div>
+      <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${{(count/maxV)*100}}%"></div></div>
+    </div>`;
   }}).join("") || "<p style='color:#bbb;font-size:13px'>Sin datos</p>";
 }}
 
+// ─── TABLE ─────────────────────────────────────────────────────
 function renderTable() {{
-  const search = (document.getElementById("search-input").value||"").toLowerCase();
+  const search = (document.getElementById("search-input").value || "").toLowerCase();
   let rows = filteredData;
-  if (typeFilter!=="ALL") rows=rows.filter(d=>d.type===typeFilter);
-  if (search) rows=rows.filter(d=>(d.cohortName||"").toLowerCase().includes(search)||(d.commissionNumber||"").toString().includes(search)||(d.description||"").toLowerCase().includes(search));
+  if (typeFilter !== "ALL") rows = rows.filter(d => d.type === typeFilter);
+  if (search) rows = rows.filter(d =>
+    (d.cohortName      || "").toLowerCase().includes(search) ||
+    (d.commissionNumber|| "").toString().includes(search)    ||
+    (d.description     || "").toLowerCase().includes(search)
+  );
   document.getElementById("table-info").textContent = `Mostrando ${{rows.length}} de ${{filteredData.length}} incidents`;
-  const sBadge = s => {{ const m={{OPEN:"open",IN_PROGRESS:"in-progress",RESOLVED:"resolved",CANCELLED:"cancelled"}}, l={{OPEN:"OPEN",IN_PROGRESS:"EN PROCESO",RESOLVED:"RESUELTO",CANCELLED:"CANCELADO"}}; return `<span class="badge badge-${{m[s]||"open"}}">${{l[s]||s}}</span>`; }};
+  const sBadge = s => {{
+    const m = {{OPEN:"open",IN_PROGRESS:"in-progress",RESOLVED:"resolved",CANCELLED:"cancelled"}};
+    const l = {{OPEN:"OPEN",IN_PROGRESS:"EN PROCESO",RESOLVED:"RESUELTO",CANCELLED:"CANCELADO"}};
+    return `<span class="badge badge-${{m[s]||"open"}}">${{l[s]||s}}</span>`;
+  }};
   document.getElementById("table-body").innerHTML = rows.map(r => {{
-    const isA=r.type==="INSTRUCTOR_ABSENCE";
-    return `<tr class="${{isA?"row-absence":"row-issues"}}"><td style="color:#313131;font-size:12px;white-space:nowrap">${{r.date.split("-").reverse().join("/")}}</td><td><strong style="font-size:12px">${{r.cohortName||"—"}}</strong></td><td style="font-weight:600">#${{r.commissionNumber||"—"}}</td><td><span class="badge ${{isA?"badge-absence":"badge-issues"}}">${{isA?"AUSENCIA":"CLASS ISSUE"}}</span></td><td>${{sBadge(r.status)}}</td><td style="color:#555;font-size:12px;max-width:200px">${{(r.description||r.summary||"—").slice(0,80)}}</td></tr>`;
+    const isA = r.type === "INSTRUCTOR_ABSENCE";
+    return `<tr class="${{isA?"row-absence":"row-issues"}}">
+      <td style="color:#313131;font-size:12px;white-space:nowrap">${{r.date.split("-").reverse().join("/")}}</td>
+      <td><strong style="font-size:12px">${{r.cohortName||"—"}}</strong></td>
+      <td style="font-weight:600">#${{r.commissionNumber||"—"}}</td>
+      <td><span class="badge ${{isA?"badge-absence":"badge-issues"}}">${{isA?"AUSENCIA":"CLASS ISSUE"}}</span></td>
+      <td>${{sBadge(r.status)}}</td>
+      <td style="color:#555;font-size:12px;max-width:200px">${{(r.description||r.summary||"—").slice(0,80)}}</td>
+    </tr>`;
   }}).join("") || "<tr><td colspan='6' style='text-align:center;padding:40px;color:#BBBBBB'>Sin resultados</td></tr>";
 }}
 
+// ─── INIT ──────────────────────────────────────────────────────
 function init() {{
   const r = getRange();
   document.getElementById("date-from").value = r.min;
-  document.getElementById("date-to").value = r.max;
+  document.getElementById("date-to").value   = r.max;
   filteredData = [...ALL_DATA];
   updateAll();
 }}
@@ -477,15 +658,15 @@ function init() {{
 
 
 if __name__ == "__main__":
-    records = build_dataset()
-    html = generate_html(records, PASSWORD_HASH)
+    records, cohort_schedule = build_dataset()
+    html = generate_html(records, cohort_schedule, PASSWORD_HASH)
     os.makedirs("output", exist_ok=True)
     with open("output/index.html", "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"✅ index.html generado con {len(records)} incidents")
+    print(f"✅ index.html generado con {len(records)} incidents y {len(cohort_schedule)} cohortes activas")
     if records:
         dates = sorted(r["date"] for r in records)
-        print(f"📅 Rango: {dates[0]} → {dates[-1]}")
+        print(f"📅 Rango incidents: {dates[0]} → {dates[-1]}")
         top3 = Counter(r["cohortName"] for r in records).most_common(3)
         print("🏆 Top 3 cursos:")
         for name, count in top3:
