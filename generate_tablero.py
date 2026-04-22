@@ -28,19 +28,20 @@ def api_get(path, headers=None):
 
 
 def fetch_all_active_cohorts():
-    """Fetch ALL IN_PROGRESS cohorts using finance key for admin access."""
+    """Fetch ALL IN_PROGRESS cohorts using the admin endpoint (student key has access)."""
     items, page = [], 1
     while True:
         try:
             data = api_get(
-                f"/student/enrollment/m2m/admin/cohorts?status=IN_PROGRESS&page={page}&limit=100",
-                headers=FINANCE_HEADERS
+                f"/student/enrollment/m2m/admin/cohorts?status=IN_PROGRESS&page={page}&limit=100"
             )
-            batch = data.get("items", [])
+            # Response shape: {"data": [...], "pagination": {"totalPages": N, ...}}
+            batch = data.get("data") or data.get("items", [])
             if not batch:
                 break
             items.extend(batch)
-            if page >= data.get("totalPages", 1):
+            total_pages = (data.get("pagination") or {}).get("totalPages") or data.get("totalPages", 1)
+            if page >= total_pages:
                 break
             page += 1
         except Exception as e:
@@ -125,8 +126,8 @@ def build_dataset():
 
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Try to fetch ALL active cohorts (requires finance/admin key)
-    print("Fetching ALL active cohorts for class density (finance key)...")
+    # Fetch ALL active cohorts for correct class density denominator
+    print("Fetching ALL active cohorts for class density...")
     all_active_raw = fetch_all_active_cohorts()
     print(f"  All active cohorts fetched: {len(all_active_raw)}")
 
