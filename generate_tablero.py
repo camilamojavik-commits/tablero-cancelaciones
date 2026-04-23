@@ -589,41 +589,64 @@ function renderTypes() {{
 
 // ─── TIMELINE ──────────────────────────────────────────────────
 function renderTimeline() {{
-  const container = document.getElementById("timeline-bars");
-  const byDate    = {{}};
-  filteredData.forEach(d => {{ if (!byDate[d.date]) byDate[d.date] = []; byDate[d.date].push(d); }});
-  const dates = Object.keys(byDate).sort();
-  const maxH  = 130, maxC = Math.max(...dates.map(d => byDate[d].length), 1);
-  const from  = document.getElementById("date-from").value;
-  const to    = document.getElementById("date-to").value;
-  const tt    = document.getElementById("tooltip");
-  container.innerHTML = "";
-  dates.forEach(date => {{
-    const items = byDate[date];
-    const h     = Math.max(6, (items.length / maxC) * maxH);
-    const dp    = date.split("-"), short = `${{dp[2]}}/${{dp[1]}}`;
-    const classCount = countTotalClasses(date, date);
-    const col   = document.createElement("div");
-    col.className = "timeline-bar-col";
-    col.innerHTML = `<div style="display:flex;align-items:flex-end"><div class="bar" style="height:${{h}}px;background:#FF632B" data-date="${{date}}"></div></div><div class="bar-label">${{short}}</div>`;
-    const bar = col.querySelector(".bar");
-    bar.addEventListener("mouseenter", e => {{
-      let html = `<strong>${{date.split("-").reverse().join("/")}} — ${{items.length}} incident${{items.length!==1?"s":""}}</strong>`;
-      if (classCount) {{
-        const dayRate = ((items.length / classCount) * 100).toFixed(1);
-        html += `<div class="tooltip-stat">${{items.length}} / ${{classCount}} clases = ${{dayRate}}% ese día</div>`;
-      }}
-      items.slice(0,5).forEach(i => {{
-        html += `<div class="tooltip-incident">${{i.cohortName||"—"}} #${{i.commissionNumber}}<br>${{(i.description||i.summary||"—").slice(0,60)}}</div>`;
-      }});
-      if (items.length > 5) html += `<div style="color:#888;font-size:10px;margin-top:6px">+${{items.length-5}} más...</div>`;
-      tt.innerHTML = html; tt.style.display = "block"; posTooltip(e);
+    const container = document.getElementById("timeline-bars");
+    const byDate = {{}};
+    filteredData.forEach(d => {{
+      if (!byDate[d.date]) byDate[d.date] = [];
+      byDate[d.date].push(d);
     }});
-    bar.addEventListener("mousemove", posTooltip);
-    bar.addEventListener("mouseleave", () => tt.style.display = "none");
-    container.appendChild(col);
-  }});
-}}
+    const fromVal = document.getElementById("date-from").value;
+    const toVal   = document.getElementById("date-to").value;
+    const incidentDates = Object.keys(byDate).sort();
+    const rangeStart = fromVal || (incidentDates.length ? incidentDates[0] : "");
+    const rangeEnd   = toVal   || (incidentDates.length ? incidentDates[incidentDates.length-1] : "");
+    if (!rangeStart || !rangeEnd) {{ container.innerHTML = ""; return; }}
+    const allDays = [];
+    for (let d = new Date(rangeStart + "T12:00:00"); d <= new Date(rangeEnd + "T12:00:00"); d.setDate(d.getDate()+1)) {{
+      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day2 = String(d.getDate()).padStart(2,"0");
+      allDays.push(`${{y}}-${{m}}-${{day2}}`);
+    }}
+    const maxC = Math.max(...incidentDates.map(d => byDate[d].length), 1);
+    const maxH = 130;
+    const tt = document.getElementById("tooltip");
+    container.innerHTML = "";
+    allDays.forEach(date => {{
+      const items = byDate[date] || [];
+      const count = items.length;
+      const h = count > 0 ? Math.max(6, (count / maxC) * maxH) : 8;
+      const dp = date.split("-"), short = `${{dp[2]}}/${{dp[1]}}`;
+      const classCount = countTotalClasses(date, date);
+      const col = document.createElement("div");
+      col.className = "timeline-bar-col";
+      const barColor = count > 0 ? "#FF632B" : "#BBBBBB";
+      const barOpacity = count > 0 ? "1" : "0.4";
+      col.innerHTML = `<div style="display:flex;align-items:flex-end"><div class="bar" style="height:${{h}}px;background:${{barColor}};opacity:${{barOpacity}}" data-date="${{date}}"></div></div><div class="bar-label" style="color:${{count>0?'#313131':'#BBBBBB'}}">${{short}}</div>`;
+      const bar = col.querySelector(".bar");
+      bar.addEventListener("mouseenter", e => {{
+        if (count === 0) {{
+          tt.innerHTML = `<strong style="color:#BBBBBB">${{date.split("-").reverse().join("/")}}</strong><div style="color:#BBBBBB;font-size:11px;margin-top:4px">Sin cancelaciones ese d\u00eda \u2713</div>`;
+          tt.style.display = "block";
+          posTooltip(e);
+          return;
+        }}
+        let html = `<strong>${{date.split("-").reverse().join("/")}} — ${{items.length}} incident${{items.length!==1?"s":""}}</strong>`;
+        if (classCount) {{
+          const dayRate = ((items.length / classCount) * 100).toFixed(1);
+          html += `<div class="tooltip-stat">${{items.length}} / ${{classCount}} clases = ${{dayRate}}% ese d\u00eda</div>`;
+        }}
+        items.slice(0,5).forEach(i => {{
+          html += `<div class="tooltip-incident">${{i.cohortName||"\u2014"}} #${{i.commissionNumber}}<br>${{(i.description||i.summary||"\u2014").slice(0,60)}}</div>`;
+        }});
+        if (items.length > 5) html += `<div style="color:#888;font-size:10px;margin-top:6px">+${{items.length-5}} m\u00e1s...</div>`;
+        tt.innerHTML = html;
+        tt.style.display = "block";
+        posTooltip(e);
+      }});
+      bar.addEventListener("mousemove", posTooltip);
+      bar.addEventListener("mouseleave", () => tt.style.display = "none");
+      container.appendChild(col);
+    }});
+  }}
 
 function posTooltip(e) {{
   const tt = document.getElementById("tooltip"), m = 12;
