@@ -9,8 +9,18 @@ import os
 import re
 import json
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import Counter
+
+ARGENTINA_TZ = timezone(timedelta(hours=-3))
+
+def to_argentina_date(utc_iso):
+        """Convert UTC ISO timestamp to Argentina date (UTC-3, no DST)."""
+        try:
+                    dt = datetime.fromisoformat(utc_iso.replace("Z", "+00:00"))
+                    return (dt - timedelta(hours=3)).strftime("%Y-%m-%d")
+        except Exception:
+                    return (utc_iso or "")[:10]
 
 API_URL = os.environ["CODERHOUSE_API_URL"].rstrip("/")
 API_KEY = os.environ["CODERHOUSE_API_KEY"]
@@ -114,7 +124,7 @@ def build_dataset():
             continue
         records.append({
             "id": inc["id"],
-            "date": inc["createdAt"][:10],
+            "date": to_argentina_date(inc.get("createdAt", "")),  # UTC→ARG (UTC-3)
             "type": inc["type"],
             "status": inc["status"],
             "summary": inc.get("summary", ""),
