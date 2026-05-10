@@ -6,7 +6,7 @@ Requiere: CODERHOUSE_API_URL, CODERHOUSE_API_KEY como variables de entorno.
 """
 
 import os
-import r
+import re
 import json
 import requests
 from datetime import datetime, timezone, timedelta
@@ -115,7 +115,7 @@ def build_dataset():
         print(f"  {status}: {len(items)}")
         all_incidents.extend(items)
 
-        filtered = [i for i in all_incidents if i.get("type") in ("INSTRUCTOR_ABSENCE", "CLASS_ISSUES") and not any(p in ((i.get("summary") or "") + " " + (i.get("description") or "")).lower() for p in ["fecha de inicio", "fecha de inici", "nueva fecha", "cambio de fecha", "se movi", "se posterg", "movimiento al"])]
+    filtered = [i for i in all_incidents if i.get("type") in ("INSTRUCTOR_ABSENCE", "CLASS_ISSUES") and not any(p in ((i.get("summary") or "") + " " + (i.get("description") or "")).lower() for p in ["fecha de inicio", "fecha de inici", "nueva fecha", "cambio de fecha", "se movi", "se posterg", "movimiento al"])]
     print(f"After type filter: {len(filtered)}")
 
     target_ids = set(i.get("targetId", "") for i in filtered if i.get("targetId"))
