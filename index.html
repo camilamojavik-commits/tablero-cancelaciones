@@ -251,7 +251,7 @@
     align-items: center;
     border-bottom: 1px solid #F8F2E8;
   }
-  .table-controls input {
+  .table-controls input[type="text"] {
     flex: 1;
     min-width: 180px;
     padding: 8px 14px;
@@ -261,7 +261,33 @@
     font-size: 13px;
     outline: none;
   }
-  .table-controls input:focus { border-color: #FF632B; }
+  .table-controls input[type="text"]:focus { border-color: #FF632B; }
+  .date-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .date-filter label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #313131;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+  .date-filter input[type="date"] {
+    padding: 7px 10px;
+    border: 1.5px solid #e8e0d6;
+    border-radius: 8px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 12px;
+    color: #313131;
+    outline: none;
+    background: #fff;
+    cursor: pointer;
+  }
+  .date-filter input[type="date"]:focus { border-color: #FF632B; }
   .filter-btns { display: flex; gap: 8px; }
   .filter-btn {
     padding: 7px 14px;
@@ -399,6 +425,12 @@
   <div class="table-card">
     <div class="table-controls">
       <input type="text" id="search-input" placeholder="Buscar por curso, comisión, descripción..." oninput="applyFilters()">
+      <div class="date-filter">
+        <label>Desde</label>
+        <input type="date" id="date-from" onchange="applyFilters()">
+        <label>Hasta</label>
+        <input type="date" id="date-to" onchange="applyFilters()">
+      </div>
       <div class="filter-btns">
         <button class="filter-btn active" onclick="setFilter('todos', this)">Todos</button>
         <button class="filter-btn" onclick="setFilter('INSTRUCTOR_ABSENCE', this)">Ausencia Instructor</button>
@@ -640,6 +672,7 @@ function buildTable(incidents) {
 
     const tr = document.createElement("tr");
     tr.setAttribute("data-tipo", i.tipo);
+    tr.setAttribute("data-fecha", i.fecha);
     tr.setAttribute("data-search", `${i.curso} ${i.comision} ${i.descripcion}`.toLowerCase());
     tr.innerHTML = `
       <td class="${tipoClass}" style="font-weight:600;white-space:nowrap">${formatDate(i.fecha)}</td>
@@ -655,12 +688,17 @@ function buildTable(incidents) {
 
 function applyFilters() {
   const search = document.getElementById("search-input").value.toLowerCase();
+  const dateFrom = document.getElementById("date-from").value;
+  const dateTo = document.getElementById("date-to").value;
   const rows = document.querySelectorAll("#table-body tr[data-tipo]");
   let visible = 0;
   rows.forEach(row => {
     const matchFilter = currentFilter === "todos" || row.getAttribute("data-tipo") === currentFilter;
     const matchSearch = !search || row.getAttribute("data-search").includes(search);
-    if (matchFilter && matchSearch) { row.classList.remove("hidden"); visible++; }
+    const rowDate = row.getAttribute("data-fecha");
+    const matchFrom = !dateFrom || rowDate >= dateFrom;
+    const matchTo = !dateTo || rowDate <= dateTo;
+    if (matchFilter && matchSearch && matchFrom && matchTo) { row.classList.remove("hidden"); visible++; }
     else row.classList.add("hidden");
   });
   document.getElementById("results-count").textContent =
@@ -673,6 +711,9 @@ function setFilter(f, btn) {
   btn.classList.add("active");
   applyFilters();
 }
+
+document.getElementById("date-from").value = PERIOD_START;
+document.getElementById("date-to").value = PERIOD_END;
 
 buildKPIs();
 buildTimeline();
