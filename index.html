@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tablero de Cancelaciones â Coderhouse</title>
+<title>Tablero de Cancelaciones — Coderhouse</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -155,7 +155,7 @@
   }
   .bar-label.active { color: #FF632B; }
 
-  /* TOOLTIP â se posiciona abajo de la barra */
+  /* TOOLTIP — se posiciona abajo de la barra */
   .tooltip {
     display: none;
     position: absolute;
@@ -336,48 +336,48 @@
 <div class="header">
   <div class="header-left">
     <h1>Tablero de Cancelaciones</h1>
-    <div class="periodo">PerÃ­odo: Esta semana â 05/05/2026 al 11/05/2026</div>
+    <div class="periodo">Período: Esta semana — 05/05/2026 al 11/05/2026</div>
   </div>
   <div class="logo">CODERHOUSE</div>
 </div>
 
 <div class="alert-banner">
-  <span class="alert-icon">â ï¸</span>
+  <span class="alert-icon">⚠️</span>
   <div class="alert-text">
     <span>Incident del 11/05 (ayer) NO encontrado en el sistema.</span>
-    ComisiÃ³n 47 â ambos profesores se bajaron. Incident cargado manualmente en el tablero. No registrado en backoffice.
+    Comisión 47 — ambos profesores se bajaron. Incident cargado manualmente en el tablero. No registrado en backoffice.
   </div>
 </div>
 
 <main>
 
   <!-- KPIs -->
-  <div class="section-title">Resumen del perÃ­odo</div>
+  <div class="section-title">Resumen del período</div>
   <div class="kpis">
     <div class="kpi-card">
       <div class="kpi-label">Total cancelaciones</div>
-      <div class="kpi-value" id="kpi-total">â</div>
-      <div class="kpi-sub">incidents en el perÃ­odo</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-sub">incidents en el período</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Comisiones afectadas</div>
-      <div class="kpi-value" id="kpi-comisiones">â</div>
-      <div class="kpi-sub">comisiones Ãºnicas</div>
+      <div class="kpi-value" id="kpi-comisiones">—</div>
+      <div class="kpi-sub">comisiones únicas</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">DÃ­as con incidentes</div>
-      <div class="kpi-value" id="kpi-dias">â</div>
-      <div class="kpi-sub">dÃ­as distintos</div>
+      <div class="kpi-label">Días con incidentes</div>
+      <div class="kpi-value" id="kpi-dias">—</div>
+      <div class="kpi-sub">días distintos</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Curso mÃ¡s afectado</div>
-      <div class="kpi-value" id="kpi-top-val">â</div>
-      <div class="kpi-sub" id="kpi-top-name">â</div>
+      <div class="kpi-label">Curso más afectado</div>
+      <div class="kpi-value" id="kpi-top-val">—</div>
+      <div class="kpi-sub" id="kpi-top-name">—</div>
     </div>
   </div>
 
   <!-- TIMELINE -->
-  <div class="section-title">Timeline dÃ­a a dÃ­a</div>
+  <div class="section-title">Timeline día a día</div>
   <div class="timeline-card">
     <div class="timeline-bars" id="timeline-bars"></div>
   </div>
@@ -385,7 +385,7 @@
   <!-- RANKING + TIPO -->
   <div class="grid-2">
     <div class="card">
-      <div class="card-title">Ranking por comisiÃ³n</div>
+      <div class="card-title">Ranking por comisión</div>
       <div id="ranking-list"></div>
     </div>
     <div class="card">
@@ -398,7 +398,7 @@
   <div class="section-title">Detalle de incidentes</div>
   <div class="table-card">
     <div class="table-controls">
-      <input type="text" id="search-input" placeholder="Buscar por curso, comisiÃ³n, descripciÃ³n..." oninput="applyFilters()">
+      <input type="text" id="search-input" placeholder="Buscar por curso, comisión, descripción..." oninput="applyFilters()">
       <div class="filter-btns">
         <button class="filter-btn active" onclick="setFilter('todos', this)">Todos</button>
         <button class="filter-btn" onclick="setFilter('INSTRUCTOR_ABSENCE', this)">Ausencia Instructor</button>
@@ -411,10 +411,10 @@
         <tr>
           <th>Fecha</th>
           <th>Curso</th>
-          <th>ComisiÃ³n</th>
+          <th>Comisión</th>
           <th>Tipo</th>
           <th>Estado</th>
-          <th>DescripciÃ³n</th>
+          <th>Descripción</th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
@@ -425,7 +425,7 @@
 
 <footer>
   <div class="footer-logo">CODERHOUSE</div>
-  <div class="footer-date">Generado el 12/05/2026 â Fuente: API education-scheduling-service</div>
+  <div class="footer-date">Generado el 12/05/2026 — Fuente: API education-scheduling-service</div>
 </footer>
 
 <script>
@@ -433,7 +433,7 @@ const INCIDENTS = [
   {
     id: "9b5a4c87",
     fecha: "2026-05-09",
-    curso: "ProgramaciÃ³n Backend II: DiseÃ±o y Arquitectura Backend Flex",
+    curso: "Programación Backend II: Diseño y Arquitectura Backend Flex",
     comision: "94920",
     tipo: "INSTRUCTOR_ABSENCE",
     estado: "OPEN",
@@ -442,7 +442,7 @@ const INCIDENTS = [
   {
     id: "manual-47",
     fecha: "2026-05-11",
-    curso: "OptimizaciÃ³n del Agente mediante Human-Feedback Loops",
+    curso: "Optimización del Agente mediante Human-Feedback Loops",
     comision: "47",
     tipo: "INSTRUCTOR_ABSENCE",
     estado: "OPEN",
@@ -491,7 +491,7 @@ function buildKPIs() {
   document.getElementById("kpi-dias").textContent = dias;
   if (topCurso) {
     document.getElementById("kpi-top-val").textContent = topCurso[1];
-    const shortName = topCurso[0].substring(0, 22) + (topCurso[0].length > 22 ? "â¦" : "");
+    const shortName = topCurso[0].substring(0, 22) + (topCurso[0].length > 22 ? "…" : "");
     document.getElementById("kpi-top-name").textContent = shortName;
   }
 }
@@ -527,14 +527,14 @@ function buildTimeline() {
     let ttHtml = `<div class="tt-date">${formatDateFull(d)}</div>`;
     if (count === 0) {
       if (isYesterday) {
-        ttHtml += `<div class="tt-item" style="color:#FE64A3">â ï¸ Sin incident registrado</div>`;
+        ttHtml += `<div class="tt-item" style="color:#FE64A3">⚠️ Sin incident registrado</div>`;
       } else {
         ttHtml += `<div class="tt-item">Sin cancelaciones</div>`;
       }
     } else {
       ttHtml += `<div class="tt-item"><strong>${count} incident${count>1?'s':''}</strong></div>`;
       items.forEach(i => {
-        ttHtml += `<div class="tt-item">Â· Com. ${i.comision}: ${i.descripcion.substring(0,50)}â¦</div>`;
+        ttHtml += `<div class="tt-item">· Com. ${i.comision}: ${i.descripcion.substring(0,50)}…</div>`;
       });
     }
 
@@ -568,20 +568,20 @@ function buildRanking() {
   container.innerHTML = "";
 
   if (sorted.length === 0) {
-    container.innerHTML = '<div style="color:#BBBBBB;font-size:13px">Sin datos en el perÃ­odo</div>';
+    container.innerHTML = '<div style="color:#BBBBBB;font-size:13px">Sin datos en el período</div>';
     return;
   }
 
   sorted.forEach(([com, cnt]) => {
     const pct = (cnt / maxC) * 100;
     const fullName = comNames[com];
-    const shortName = fullName.substring(0, 26) + (fullName.length > 26 ? "â¦" : "");
+    const shortName = fullName.substring(0, 26) + (fullName.length > 26 ? "…" : "");
     const row = document.createElement("div");
     row.className = "rank-item";
     row.innerHTML = `
       <div style="min-width:0">
         <div class="rank-label">${shortName}</div>
-        <div style="font-size:11px;color:#BBBBBB">ComisiÃ³n ${com}</div>
+        <div style="font-size:11px;color:#BBBBBB">Comisión ${com}</div>
       </div>
       <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
       <div class="rank-count">${cnt}</div>
