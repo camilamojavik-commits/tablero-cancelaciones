@@ -534,20 +534,44 @@ function buildKPIs(incidents = INCIDENTS) {
 }
 
 function buildTimeline(incidents = INCIDENTS, start = PERIOD_START, end = PERIOD_END) {
-  const dates = getDatesInRange(start, end);
-  const byDate = {};
-  dates.forEach(d => byDate[d] = []);
-  incidents.forEach(i => { if (byDate[i.fecha]) byDate[i.fecha].push(i); });
+  const allDates = getDatesInRange(start, end);
 
-  const maxCount = Math.max(...Object.values(byDate).map(v => v.length), 1);
+  // Build incident lookup by date
+  const byDate = {};
+  allDates.forEach(d => byDate[d] = []);
+  incidents.forEach(i => { if (byDate[i.fecha] !== undefined) byDate[i.fecha].push(i); });
+
+  // Group by day (<=14 days) or by week (>14 days)
+  let groups;
+  if (allDates.length <= 14) {
+    groups = allDates.map(d => ({
+      dates: [d],
+      label: formatDate(d),
+      items: byDate[d] || []
+    }));
+  } else {
+    groups = [];
+    for (let i = 0; i < allDates.length; i += 7) {
+      const chunk = allDates.slice(i, i + 7);
+      const items = [];
+      chunk.forEach(d => items.push(...(byDate[d] || [])));
+      groups.push({
+        dates: chunk,
+        label: formatDate(chunk[0]),
+        labelEnd: formatDate(chunk[chunk.length - 1]),
+        items
+      });
+    }
+  }
+
+  const maxCount = Math.max(...groups.map(g => g.items.length), 1);
   const container = document.getElementById("timeline-bars");
   container.innerHTML = "";
 
-  dates.forEach(d => {
-    const items = byDate[d];
-    const count = items.length;
+  groups.forEach(g => {
+    const count = g.items.length;
     const heightPct = count > 0 ? Math.max((count / maxCount) * 80, 10) : 4;
-    const isYesterday = d === "2026-05-11";
+    const isWeekly = allDates.length > 14;
 
     const wrap = document.createElement("div");
     wrap.className = "bar-wrap";
@@ -556,21 +580,17 @@ function buildTimeline(incidents = INCIDENTS, start = PERIOD_START, end = PERIOD
     const bar = document.createElement("div");
     bar.className = "bar " + (count > 0 ? "has-incidents" : "no-incidents");
     bar.style.height = heightPct + "%";
-    if (isYesterday && count === 0) {
-      bar.style.background = "#FE64A3";
-      bar.style.opacity = "0.4";
-    }
 
-    let ttHtml = `<div class="tt-date">${formatDateFull(d)}</div>`;
+    // Tooltip
+    const rangeLabel = isWeekly
+      ? `${formatDate(g.dates[0])} – ${formatDate(g.dates[g.dates.length-1])}`
+      : formatDateFull(g.dates[0]);
+    let ttHtml = `<div class="tt-date">${rangeLabel}</div>`;
     if (count === 0) {
-      if (isYesterday) {
-        ttHtml += `<div class="tt-item" style="color:#FE64A3">⚠️ Sin incident registrado</div>`;
-      } else {
-        ttHtml += `<div class="tt-item">Sin cancelaciones</div>`;
-      }
+      ttHtml += `<div class="tt-item">Sin cancelaciones</div>`;
     } else {
       ttHtml += `<div class="tt-item"><strong>${count} incident${count>1?'s':''}</strong></div>`;
-      items.forEach(i => {
+      g.items.forEach(i => {
         ttHtml += `<div class="tt-item">· Com. ${i.comision}: ${i.descripcion.substring(0,50)}…</div>`;
       });
     }
@@ -581,8 +601,7 @@ function buildTimeline(incidents = INCIDENTS, start = PERIOD_START, end = PERIOD
 
     const label = document.createElement("div");
     label.className = "bar-label" + (count > 0 ? " active" : "");
-    label.textContent = formatDate(d);
-    if (isYesterday) label.style.color = "#FE64A3";
+    label.textContent = g.label;
 
     wrap.appendChild(bar);
     wrap.appendChild(label);
