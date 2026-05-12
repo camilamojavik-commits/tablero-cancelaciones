@@ -43,24 +43,6 @@
     letter-spacing: 0.2em;
   }
 
-  /* ALERTA */
-  .alert-banner {
-    background: #fff3cd;
-    border-left: 5px solid #FF632B;
-    padding: 14px 40px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .alert-banner .alert-icon { font-size: 20px; }
-  .alert-banner .alert-text {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: #260700;
-  }
-  .alert-banner .alert-text span {
-    color: #FF632B;
-  }
 
   /* MAIN */
   main { padding: 32px 40px; max-width: 1200px; margin: 0 auto; }
@@ -378,13 +360,6 @@
   <div class="logo">CODERHOUSE</div>
 </div>
 
-<div class="alert-banner">
-  <span class="alert-icon">⚠️</span>
-  <div class="alert-text">
-    <span>Incident del 11/05 (ayer) NO encontrado en el sistema.</span>
-    Comisión 47 — ambos profesores se bajaron. Incident cargado manualmente en el tablero. No registrado en backoffice.
-  </div>
-</div>
 
 <main>
 
@@ -392,10 +367,11 @@
   <div class="date-filter-bar">
     <div class="date-filter">
       <label>Desde</label>
-      <input type="date" id="date-from" onchange="applyFilters()">
+      <input type="date" id="date-from">
       <label>Hasta</label>
-      <input type="date" id="date-to" onchange="applyFilters()">
+      <input type="date" id="date-to">
     </div>
+    <button class="refresh-btn" onclick="refreshDashboard()">↻ Actualizar</button>
   </div>
 
   <!-- KPIs -->
@@ -524,13 +500,13 @@ function formatDateFull(d) {
   return `${parseInt(day)} ${months[parseInt(m)-1]} ${y}`;
 }
 
-function buildKPIs() {
-  const total = INCIDENTS.length;
-  const comisiones = new Set(INCIDENTS.map(i => i.comision)).size;
-  const dias = new Set(INCIDENTS.map(i => i.fecha)).size;
+function buildKPIs(incidents = INCIDENTS) {
+  const total = incidents.length;
+  const comisiones = new Set(incidents.map(i => i.comision)).size;
+  const dias = new Set(incidents.map(i => i.fecha)).size;
 
   const cursoCounts = {};
-  INCIDENTS.forEach(i => { cursoCounts[i.curso] = (cursoCounts[i.curso]||0) + 1; });
+  incidents.forEach(i => { cursoCounts[i.curso] = (cursoCounts[i.curso]||0) + 1; });
   const topCurso = Object.entries(cursoCounts).sort((a,b) => b[1]-a[1])[0];
 
   document.getElementById("kpi-total").textContent = total;
@@ -543,11 +519,11 @@ function buildKPIs() {
   }
 }
 
-function buildTimeline() {
-  const dates = getDatesInRange(PERIOD_START, PERIOD_END);
+function buildTimeline(incidents = INCIDENTS, start = PERIOD_START, end = PERIOD_END) {
+  const dates = getDatesInRange(start, end);
   const byDate = {};
   dates.forEach(d => byDate[d] = []);
-  INCIDENTS.forEach(i => { if (byDate[i.fecha]) byDate[i.fecha].push(i); });
+  incidents.forEach(i => { if (byDate[i.fecha]) byDate[i.fecha].push(i); });
 
   const maxCount = Math.max(...Object.values(byDate).map(v => v.length), 1);
   const container = document.getElementById("timeline-bars");
@@ -601,10 +577,10 @@ function buildTimeline() {
   });
 }
 
-function buildRanking() {
+function buildRanking(incidents = INCIDENTS) {
   const comCounts = {};
   const comNames = {};
-  INCIDENTS.forEach(i => {
+  incidents.forEach(i => {
     comCounts[i.comision] = (comCounts[i.comision]||0) + 1;
     comNames[i.comision] = i.curso;
   });
@@ -637,10 +613,10 @@ function buildRanking() {
   });
 }
 
-function buildTipo() {
+function buildTipo(incidents = INCIDENTS) {
   const counts = { INSTRUCTOR_ABSENCE: 0, CLASS_ISSUES: 0 };
-  INCIDENTS.forEach(i => { if (counts[i.tipo] !== undefined) counts[i.tipo]++; });
-  const total = INCIDENTS.length || 1;
+  incidents.forEach(i => { if (counts[i.tipo] !== undefined) counts[i.tipo]++; });
+  const total = incidents.length || 1;
 
   const container = document.getElementById("tipo-breakdown");
   container.innerHTML = "";
@@ -727,15 +703,23 @@ function setFilter(f, btn) {
   applyFilters();
 }
 
+function refreshDashboard() {
+  const from = document.getElementById("date-from").value || PERIOD_START;
+  const to   = document.getElementById("date-to").value   || PERIOD_END;
+  const filtered = INCIDENTS.filter(i => i.fecha >= from && i.fecha <= to);
+  buildKPIs(filtered);
+  buildTimeline(filtered, from, to);
+  buildRanking(filtered);
+  buildTipo(filtered);
+  buildTable(filtered);
+  document.getElementById("results-count").textContent =
+    `Mostrando ${filtered.length} de ${INCIDENTS.length} cancelaciones`;
+}
+
 document.getElementById("date-from").value = PERIOD_START;
 document.getElementById("date-to").value = PERIOD_END;
 
-buildKPIs();
-buildTimeline();
-buildRanking();
-buildTipo();
-buildTable(INCIDENTS);
-applyFilters();
+refreshDashboard();
 </script>
 
 </body>
