@@ -262,10 +262,21 @@
     outline: none;
   }
   .table-controls input[type="text"]:focus { border-color: #FF632B; }
-  .date-filter {
+  .date-filter-bar {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    border: 1.5px solid #e8e0d6;
+  }
+    .date-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
   }
   .date-filter label {
@@ -377,6 +388,16 @@
 
 <main>
 
+  <!-- FILTRO DE FECHAS -->
+  <div class="date-filter-bar">
+    <div class="date-filter">
+      <label>Desde</label>
+      <input type="date" id="date-from" onchange="applyFilters()">
+      <label>Hasta</label>
+      <input type="date" id="date-to" onchange="applyFilters()">
+    </div>
+  </div>
+
   <!-- KPIs -->
   <div class="section-title">Resumen del período</div>
   <div class="kpis">
@@ -425,12 +446,6 @@
   <div class="table-card">
     <div class="table-controls">
       <input type="text" id="search-input" placeholder="Buscar por curso, comisión, descripción..." oninput="applyFilters()">
-      <div class="date-filter">
-        <label>Desde</label>
-        <input type="date" id="date-from" onchange="applyFilters()">
-        <label>Hasta</label>
-        <input type="date" id="date-to" onchange="applyFilters()">
-      </div>
       <div class="filter-btns">
         <button class="filter-btn active" onclick="setFilter('todos', this)">Todos</button>
         <button class="filter-btn" onclick="setFilter('INSTRUCTOR_ABSENCE', this)">Ausencia Instructor</button>
