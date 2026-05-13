@@ -462,11 +462,20 @@
 
 <footer>
   <div class="footer-logo">CODERHOUSE</div>
-  <div class="footer-date">Generado el 12/05/2026 — Fuente: API education-scheduling-service</div>
+  <div class="footer-date">Generado el 13/05/2026 — Fuente: API education-scheduling-service</div>
 </footer>
 
 <script>
 const INCIDENTS = [
+  {
+    id: "6a373cfe",
+    fecha: "2026-05-12",
+    curso: "Data Analytics",
+    comision: "97250",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia de staff. TAs no pueden tomar la suplencia"
+  },
   {
     id: "9b5a4c87",
     fecha: "2026-05-09",
@@ -477,18 +486,153 @@ const INCIDENTS = [
     descripcion: "Ausencia de Profesor por problemas de salud. Tutora no puede tomar la clase por emergencia familiar."
   },
   {
-    id: "manual-47",
-    fecha: "2026-05-11",
-    curso: "Optimización del Agente mediante Human-Feedback Loops",
-    comision: "47",
+    id: "f17086cb",
+    fecha: "2026-04-27",
+    curso: "Publicidad en Redes Avanzado Flex",
+    comision: "92820",
     tipo: "INSTRUCTOR_ABSENCE",
     estado: "OPEN",
-    descripcion: "Ambos profesores se bajaron. Clase del 11/05 cancelada sin cobertura de staff."
+    descripcion: "Ausencia de profesora por problemas de salud. TA no toma suplencia"
+  },
+  {
+    id: "cff2f0f4",
+    fecha: "2026-04-22",
+    curso: "SQL Flex",
+    comision: "89235",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Profesora no pudo dictar la clase y el TA no puede tomar la suplencia por problemas de conexión"
+  },
+  {
+    id: "cbb40f1b",
+    fecha: "2026-04-20",
+    curso: "Oratoria Flex",
+    comision: "92995",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Se postergó el inicio de la comisión"
+  },
+  {
+    id: "166ac6e3",
+    fecha: "2026-04-18",
+    curso: "Data Science III: NLP & Deep Learning aplicado a Ciencia de Datos Flex",
+    comision: "96725",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia de profesor. TA no toma la suplencia"
+  },
+  {
+    id: "0e06f6eb",
+    fecha: "2026-04-15",
+    curso: "Programación Backend (III): Testing y Escalabilidad Flex",
+    comision: "96770",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia de profesor por motivos personales. TA no puede tomar suplencia."
+  },
+  {
+    id: "06d6ef57",
+    fecha: "2026-04-14",
+    curso: "Python",
+    comision: "89390",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "No hay staff"
+  },
+  {
+    id: "5d8567b1",
+    fecha: "2026-04-11",
+    curso: "Data Science III: NLP & Deep Learning aplicado a Ciencia de Datos Flex",
+    comision: "96725",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia de profesor. TA no dicta la clase."
+  },
+  {
+    id: "8c27729b",
+    fecha: "2026-04-09",
+    curso: "AI Automation Avanzado",
+    comision: "97020",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia de profesor. TA no dicta clase"
+  },
+  {
+    id: "3d1b32b8",
+    fecha: "2026-04-09",
+    curso: "AI Automation",
+    comision: "96820",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia de profesor"
+  },
+  {
+    id: "79d99ae5",
+    fecha: "2026-04-09",
+    curso: "Sin identificar",
+    comision: "—",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia del staff"
+  },
+  {
+    id: "fa50164b",
+    fecha: "2026-04-08",
+    curso: "Sin identificar",
+    comision: "—",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Cancelacion de clases por ausencia de staff"
+  },
+  {
+    id: "ecbe11ea",
+    fecha: "2026-04-07",
+    curso: "AI Automation",
+    comision: "96820",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "El reemplazo no se presentó ni se comunicó"
+  },
+  {
+    id: "12abc756",
+    fecha: "2026-04-07",
+    curso: "Programación Backend II: Diseño y Arquitectura Backend Flex",
+    comision: "97185",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Problemas con el link de zoom para ingreso"
+  },
+  {
+    id: "d46a76aa",
+    fecha: "2026-04-06",
+    curso: "Finanzas Personales Flex",
+    comision: "91980",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia de profesor TA no puede tomar la clase"
+  },
+  {
+    id: "e73656a2",
+    fecha: "2026-04-06",
+    curso: "AI Automation",
+    comision: "97570",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Ausencia por anfermedad. TA no llega a la clase"
+  },
+  {
+    id: "26a5f545",
+    fecha: "2026-04-02",
+    curso: "Growth Marketing Flex",
+    comision: "89880",
+    tipo: "INSTRUCTOR_ABSENCE",
+    estado: "OPEN",
+    descripcion: "Problemas tecnicos con el zoom"
   }
 ];
 
-const PERIOD_START = "2026-05-05";
-const PERIOD_END   = "2026-05-11";
+const PERIOD_START = "2026-04-01";
+const PERIOD_END   = "2026-05-13";
 
 let currentFilter = "todos";
 
