@@ -369,7 +369,7 @@
 <div class="header">
   <div class="header-left">
     <h1>Tablero de Cancelaciones</h1>
-    <div class="periodo">Período: Esta semana — 05/05/2026 al 11/05/2026</div>
+    <div class="periodo" id="header-periodo">Período: cargando...</div>
   </div>
   <div class="logo">CODERHOUSE</div>
 </div>
@@ -883,6 +883,10 @@ function setFilter(f, btn) {
 function refreshDashboard() {
   const from = document.getElementById("date-from").value || PERIOD_START;
   const to   = document.getElementById("date-to").value   || PERIOD_END;
+  // Update header period text dynamically
+  const fmtFrom = from.split('-').reverse().slice(0,2).join('/');
+  const fmtTo   = to.split('-').reverse().slice(0,2).join('/');
+  document.getElementById("header-periodo").textContent = `Período: ${fmtFrom} al ${fmtTo}`;
   const filtered = INCIDENTS.filter(i => i.fecha >= from && i.fecha <= to);
   buildKPIs(filtered);
   buildTimeline(filtered, from, to);
