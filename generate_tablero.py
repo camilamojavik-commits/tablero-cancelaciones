@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 from collections import Counter
 
 ARGENTINA_TZ = timezone(timedelta(hours=-3))
-def to_argentina_date(utc_iso)
+def to_argentina_date(utc_iso):
         """Convert UTC ISO timestamp to Argentina date (UTC-3, no DST)."""
         try:
                     dt = datetime.fromisoformat(utc_iso.replace("Z", "+00:00"))
