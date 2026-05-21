@@ -81,7 +81,7 @@ def fetch_all_incidents(status):
 def is_test_cohort(name):
     if not name:
         return True
-    if re.match(r"^Cohort \d{4}/\d{2}/\d{2} \(\d+\)$", name):
+    if re.match(r"^Cohort \d{4}/\d{2}/\d{2}( \(\d+\))?$", name):
         return True
     if "demo" in name.lower():
         return True
