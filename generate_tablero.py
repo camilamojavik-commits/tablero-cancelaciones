@@ -13,8 +13,7 @@ from datetime import datetime, timezone, timedelta
 from collections import Counter
 
 ARGENTINA_TZ = timezone(timedelta(hours=-3))
-
-def to_argentina_date(utc_iso):
+def to_argentina_date(utc_iso)
         """Convert UTC ISO timestamp to Argentina date (UTC-3, no DST)."""
         try:
                     dt = datetime.fromisoformat(utc_iso.replace("Z", "+00:00"))
@@ -115,7 +114,7 @@ def build_dataset():
         print(f"  {status}: {len(items)}")
         all_incidents.extend(items)
 
-    filtered = [i for i in all_incidents if i.get("type") in ("INSTRUCTOR_ABSENCE", "CLASS_ISSUES") and not any(p in ((i.get("summary") or "") + " " + (i.get("description") or "")).lower() for p in ["fecha de inicio", "fecha de inici", "nueva fecha", "cambio de fecha", "se movi", "se posterg", "movimiento al"])]
+    filtered = [i for i in all_incidents if i.get("type") in ("INSTRUCTOR_ABSENCE", "CLASS_ISSUES") and not any(p in ((i.get("summary") or "") + " " + (i.get("description") or "")).lower() for p in ["fecha de inicio", "fecha de inici", "nueva fecha", "cambio de fecha", "se movi", "se posterg", "movimiento al", "se corre", "se reprograma"])]
     print(f"After type filter: {len(filtered)}")
 
     target_ids = set(i.get("targetId", "") for i in filtered if i.get("targetId"))
